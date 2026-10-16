@@ -16,6 +16,8 @@ class MusicRepository {
             durationMs = 214000L,
             genre = "Synthwave",
             isFavorite = true,
+            isDownloaded = true,
+            audioFrequency = 440f,
             primaryColor = Color(0xFF8E24AA),
             secondaryColor = Color(0xFF00E5FF),
             lyrics = "[00:15] Cruising through the neon city lights...\n[00:30] Electric pulse underneath the midnight skies...\n[01:05] Echoes of synthesizer in the atmosphere...\n[01:40] Driving into tomorrow without any fear."
@@ -28,6 +30,8 @@ class MusicRepository {
             durationMs = 185000L,
             genre = "Lo-Fi",
             isFavorite = false,
+            isDownloaded = true,
+            audioFrequency = 330f,
             primaryColor = Color(0xFF3E2723),
             secondaryColor = Color(0xFFFFB74D),
             lyrics = "[00:10] Raindrops tapping gently against the window pane...\n[00:45] Soft jazz chords playing on a vinyl record...\n[01:20] Warm coffee steam drifting into the calm night."
@@ -40,6 +44,8 @@ class MusicRepository {
             durationMs = 248000L,
             genre = "Electronic",
             isFavorite = true,
+            isDownloaded = false,
+            audioFrequency = 523f,
             primaryColor = Color(0xFF1A237E),
             secondaryColor = Color(0xFF7C4DFF),
             lyrics = "[00:20] Floating through stellar clouds...\n[01:00] Horizons glowing with celestial starlight...\n[01:50] Lost in the vast ocean of sound."
@@ -52,6 +58,8 @@ class MusicRepository {
             durationMs = 192000L,
             genre = "Acoustic",
             isFavorite = false,
+            isDownloaded = false,
+            audioFrequency = 392f,
             primaryColor = Color(0xFFE65100),
             secondaryColor = Color(0xFFFFD54F),
             lyrics = "[00:12] Soft strumming on a wooden guitar...\n[00:50] Watching the sun dip below the ocean horizon...\n[01:30] Peace found in simple acoustic melodies."
@@ -64,6 +72,8 @@ class MusicRepository {
             durationMs = 226000L,
             genre = "Synthwave",
             isFavorite = true,
+            isDownloaded = true,
+            audioFrequency = 659f,
             primaryColor = Color(0xFFD500F9),
             secondaryColor = Color(0xFF00B0FF),
             lyrics = "[00:18] Neon grids flashing in high resolution...\n[01:02] Cybernetic rhythms powering the grid...\n[01:45] Resonance accelerating through quantum channels."
@@ -76,6 +86,8 @@ class MusicRepository {
             durationMs = 168000L,
             genre = "Lo-Fi",
             isFavorite = false,
+            isDownloaded = false,
+            audioFrequency = 293f,
             primaryColor = Color(0xFF004D40),
             secondaryColor = Color(0xFF80CBC4),
             lyrics = "[00:08] Soft tape hiss and cozy lo-fi beats...\n[00:40] Perfect soundtrack for quiet contemplation..."
@@ -88,6 +100,8 @@ class MusicRepository {
             durationMs = 260000L,
             genre = "Electronic",
             isFavorite = false,
+            isDownloaded = false,
+            audioFrequency = 587f,
             primaryColor = Color(0xFF311B92),
             secondaryColor = Color(0xFFEA80FC),
             lyrics = "[00:22] Synthesizer strings rising into a sonic crescendo...\n[01:15] Harmony between digital and analog soundwaves."

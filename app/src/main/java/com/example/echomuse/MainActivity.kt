@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Equalizer
@@ -53,6 +52,8 @@ import com.example.echomuse.ui.screens.HomeScreen
 import com.example.echomuse.ui.screens.LibraryScreen
 import com.example.echomuse.ui.screens.NowPlayingSheet
 import com.example.echomuse.ui.screens.PlaylistsScreen
+import com.example.echomuse.ui.screens.QueueBottomSheet
+import com.example.echomuse.ui.screens.SleepTimerDialog
 import com.example.echomuse.ui.theme.EchoMuseTheme
 
 class MainActivity : ComponentActivity() {
@@ -224,9 +225,13 @@ fun EchoMuseApp(
             onSkipPreviousClick = { viewModel.skipPrevious() },
             onSeek = { viewModel.seekTo(it) },
             onFavoriteToggle = { viewModel.toggleFavorite(it) },
+            onDownloadToggle = { viewModel.toggleDownload(it) },
             onShuffleToggle = { viewModel.toggleShuffle() },
             onRepeatToggle = { viewModel.toggleRepeat() },
-            onOpenEqualizer = { viewModel.setEqualizerOpen(true) }
+            onOpenEqualizer = { viewModel.setEqualizerOpen(true) },
+            onOpenSleepTimer = { viewModel.setSleepTimerDialogOpen(true) },
+            onOpenQueue = { viewModel.setQueueOpen(true) },
+            onSetSpeed = { viewModel.setPlaybackSpeed(it) }
         )
     }
 
@@ -236,6 +241,28 @@ fun EchoMuseApp(
             uiState = uiState,
             onDismiss = { viewModel.setEqualizerOpen(false) },
             onPresetSelect = { viewModel.selectEqualizerPreset(it) }
+        )
+    }
+
+    // Sleep Timer Dialog
+    if (uiState.isSleepTimerDialogOpen) {
+        SleepTimerDialog(
+            uiState = uiState,
+            onDismiss = { viewModel.setSleepTimerDialogOpen(false) },
+            onStartTimer = { viewModel.startSleepTimer(it) },
+            onCancelTimer = { viewModel.cancelSleepTimer() }
+        )
+    }
+
+    // Up Next Queue Sheet
+    if (uiState.isQueueOpen) {
+        QueueBottomSheet(
+            uiState = uiState,
+            onDismiss = { viewModel.setQueueOpen(false) },
+            onSongClick = { viewModel.playTrack(it) },
+            onRemoveFromQueue = { viewModel.removeFromQueue(it) },
+            onClearQueue = { viewModel.clearQueue() },
+            onFavoriteToggle = { viewModel.toggleFavorite(it) }
         )
     }
 }

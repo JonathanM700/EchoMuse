@@ -2,6 +2,7 @@ package com.example.echomuse.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.echomuse.data.AudioEngine
 import com.example.echomuse.data.MusicRepository
 import com.example.echomuse.model.EqualizerPreset
 import com.example.echomuse.model.Playlist
@@ -25,6 +26,7 @@ data class MusicUiState(
     val currentSong: Song? = null,
     val isPlaying: Boolean = false,
     val playbackProgressMs: Long = 0L,
+    val playbackSpeed: Float = 1.0f,
     val isShuffleEnabled: Boolean = false,
     val isRepeatEnabled: Boolean = false,
     val searchQuery: String = "",
@@ -33,8 +35,14 @@ data class MusicUiState(
     val allSongs: List<Song> = emptyList(),
     val userPlaylists: List<Playlist> = emptyList(),
     val favoriteSongIds: Set<String> = emptySet(),
+    val downloadedSongIds: Set<String> = emptySet(),
+    val playbackQueue: List<Song> = emptyList(),
     val isNowPlayingExpanded: Boolean = false,
     val isEqualizerOpen: Boolean = false,
+    val isQueueOpen: Boolean = false,
+    val isSleepTimerDialogOpen: Boolean = false,
+    val sleepTimerMinutesSelected: Int? = null,
+    val sleepTimerSecondsRemaining: Int = 0,
     val currentEqualizerPreset: EqualizerPreset = EqualizerPreset("eq_flat", "Flat", 0f, 0f, 0f, 0f, 0f, 0f),
     val equalizerPresets: List<EqualizerPreset> = emptyList()
 ) {
@@ -50,21 +58,32 @@ data class MusicUiState(
 
     val favoriteSongs: List<Song>
         get() = allSongs.filter { favoriteSongIds.contains(it.id) }
+
+    val sleepTimerFormatted: String
+        get() {
+            if (sleepTimerSecondsRemaining <= 0) return ""
+            val mins = sleepTimerSecondsRemaining / 60
+            val secs = sleepTimerSecondsRemaining % 60
+            return String.format("%d:%02d", mins, secs)
+        }
 }
 
 class MusicViewModel(
-    private val repository: MusicRepository = MusicRepository()
+    private val repository: MusicRepository = MusicRepository(),
+    private val audioEngine: AudioEngine = AudioEngine()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MusicUiState())
     val uiState: StateFlow<MusicUiState> = _uiState.asStateFlow()
 
     private var playbackJob: Job? = null
+    private var sleepTimerJob: Job? = null
 
     init {
         val initialSongs = repository.sampleSongs
         val initialPlaylists = repository.samplePlaylists
         val initialFavorites = initialSongs.filter { it.isFavorite }.map { it.id }.toSet()
+        val initialDownloads = initialSongs.filter { it.isDownloaded }.map { it.id }.toSet()
         val defaultSong = initialSongs.firstOrNull()
 
         _uiState.update {
@@ -72,6 +91,8 @@ class MusicViewModel(
                 allSongs = initialSongs,
                 userPlaylists = initialPlaylists,
                 favoriteSongIds = initialFavorites,
+                downloadedSongIds = initialDownloads,
+                playbackQueue = initialSongs,
                 currentSong = defaultSong,
                 equalizerPresets = repository.equalizerPresets,
                 currentEqualizerPreset = repository.equalizerPresets.firstOrNull()
@@ -92,17 +113,29 @@ class MusicViewModel(
                 isPlaying = true
             )
         }
+        audioEngine.startSynthTone(song.audioFrequency, _uiState.value.playbackSpeed)
         startPlaybackTimer()
     }
 
     fun togglePlayPause() {
         val currentlyPlaying = _uiState.value.isPlaying
+        val currentSong = _uiState.value.currentSong
         _uiState.update { it.copy(isPlaying = !currentlyPlaying) }
+
         if (!currentlyPlaying) {
+            if (currentSong != null) {
+                audioEngine.startSynthTone(currentSong.audioFrequency, _uiState.value.playbackSpeed)
+            }
             startPlaybackTimer()
         } else {
+            audioEngine.stopSynthTone()
             playbackJob?.cancel()
         }
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        _uiState.update { it.copy(playbackSpeed = speed) }
+        audioEngine.setSpeed(speed)
     }
 
     fun seekTo(progressMs: Long) {
@@ -113,28 +146,28 @@ class MusicViewModel(
 
     fun skipNext() {
         val state = _uiState.value
-        val songList = if (state.filteredSongs.isNotEmpty()) state.filteredSongs else state.allSongs
-        if (songList.isEmpty()) return
+        val queue = if (state.playbackQueue.isNotEmpty()) state.playbackQueue else state.allSongs
+        if (queue.isEmpty()) return
 
-        val currentIndex = songList.indexOfFirst { it.id == state.currentSong?.id }
+        val currentIndex = queue.indexOfFirst { it.id == state.currentSong?.id }
         val nextIndex = if (state.isShuffleEnabled) {
-            (songList.indices).random()
-        } else if (currentIndex != -1 && currentIndex < songList.size - 1) {
+            (queue.indices).random()
+        } else if (currentIndex != -1 && currentIndex < queue.size - 1) {
             currentIndex + 1
         } else {
             0
         }
-        playTrack(songList[nextIndex])
+        playTrack(queue[nextIndex])
     }
 
     fun skipPrevious() {
         val state = _uiState.value
-        val songList = if (state.filteredSongs.isNotEmpty()) state.filteredSongs else state.allSongs
-        if (songList.isEmpty()) return
+        val queue = if (state.playbackQueue.isNotEmpty()) state.playbackQueue else state.allSongs
+        if (queue.isEmpty()) return
 
-        val currentIndex = songList.indexOfFirst { it.id == state.currentSong?.id }
-        val prevIndex = if (currentIndex > 0) currentIndex - 1 else songList.size - 1
-        playTrack(songList[prevIndex])
+        val currentIndex = queue.indexOfFirst { it.id == state.currentSong?.id }
+        val prevIndex = if (currentIndex > 0) currentIndex - 1 else queue.size - 1
+        playTrack(queue[prevIndex])
     }
 
     fun toggleShuffle() {
@@ -169,6 +202,91 @@ class MusicViewModel(
         }
     }
 
+    fun toggleDownload(songId: String) {
+        _uiState.update { state ->
+            val updatedDownloads = state.downloadedSongIds.toMutableSet()
+            if (updatedDownloads.contains(songId)) {
+                updatedDownloads.remove(songId)
+            } else {
+                updatedDownloads.add(songId)
+            }
+            val updatedSongs = state.allSongs.map { song ->
+                if (song.id == songId) song.copy(isDownloaded = updatedDownloads.contains(songId)) else song
+            }
+            val updatedCurrentSong = if (state.currentSong?.id == songId) {
+                state.currentSong.copy(isDownloaded = updatedDownloads.contains(songId))
+            } else {
+                state.currentSong
+            }
+            state.copy(
+                downloadedSongIds = updatedDownloads,
+                allSongs = updatedSongs,
+                currentSong = updatedCurrentSong
+            )
+        }
+    }
+
+    fun startSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        val totalSeconds = minutes * 60
+        _uiState.update {
+            it.copy(
+                sleepTimerMinutesSelected = minutes,
+                sleepTimerSecondsRemaining = totalSeconds,
+                isSleepTimerDialogOpen = false
+            )
+        }
+
+        sleepTimerJob = viewModelScope.launch {
+            var secondsLeft = totalSeconds
+            while (secondsLeft > 0 && _uiState.value.sleepTimerMinutesSelected != null) {
+                delay(1000L)
+                secondsLeft--
+                _uiState.update { it.copy(sleepTimerSecondsRemaining = secondsLeft) }
+
+                // Fade out volume in the last 10 seconds
+                if (secondsLeft in 1..10) {
+                    val fadeVol = secondsLeft / 10.0f
+                    audioEngine.setVolume(fadeVol)
+                }
+            }
+
+            // Sleep timer reached 0 -> Stop playback
+            if (secondsLeft <= 0) {
+                cancelSleepTimer()
+                audioEngine.stopSynthTone()
+                _uiState.update { it.copy(isPlaying = false) }
+                playbackJob?.cancel()
+            }
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        audioEngine.setVolume(1.0f)
+        _uiState.update {
+            it.copy(
+                sleepTimerMinutesSelected = null,
+                sleepTimerSecondsRemaining = 0,
+                isSleepTimerDialogOpen = false
+            )
+        }
+    }
+
+    fun removeFromQueue(index: Int) {
+        _uiState.update { state ->
+            val mutableQueue = state.playbackQueue.toMutableList()
+            if (index in mutableQueue.indices) {
+                mutableQueue.removeAt(index)
+            }
+            state.copy(playbackQueue = mutableQueue)
+        }
+    }
+
+    fun clearQueue() {
+        _uiState.update { it.copy(playbackQueue = emptyList()) }
+    }
+
     fun setSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
     }
@@ -187,6 +305,14 @@ class MusicViewModel(
 
     fun setEqualizerOpen(open: Boolean) {
         _uiState.update { it.copy(isEqualizerOpen = open) }
+    }
+
+    fun setQueueOpen(open: Boolean) {
+        _uiState.update { it.copy(isQueueOpen = open) }
+    }
+
+    fun setSleepTimerDialogOpen(open: Boolean) {
+        _uiState.update { it.copy(isSleepTimerDialogOpen = open) }
     }
 
     fun selectEqualizerPreset(preset: EqualizerPreset) {
@@ -210,7 +336,10 @@ class MusicViewModel(
         playbackJob?.cancel()
         playbackJob = viewModelScope.launch {
             while (_uiState.value.isPlaying) {
-                delay(1000L)
+                val speed = _uiState.value.playbackSpeed.coerceAtLeast(0.1f)
+                val delayTime = (1000L / speed).toLong()
+                delay(delayTime)
+
                 val current = _uiState.value
                 val maxDuration = current.currentSong?.durationMs ?: 0L
                 val nextProgress = current.playbackProgressMs + 1000L
@@ -230,6 +359,8 @@ class MusicViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        audioEngine.stopSynthTone()
         playbackJob?.cancel()
+        sleepTimerJob?.cancel()
     }
 }

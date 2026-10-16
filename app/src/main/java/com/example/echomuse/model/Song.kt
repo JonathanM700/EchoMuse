@@ -10,6 +10,8 @@ data class Song(
     val durationMs: Long,
     val genre: String,
     val isFavorite: Boolean = false,
+    val isDownloaded: Boolean = false,
+    val audioFrequency: Float = 440f,
     val primaryColor: Color = Color(0xFF7C4DFF),
     val secondaryColor: Color = Color(0xFF00E5FF),
     val lyrics: String = "Instrumental audio track - Enjoy the rhythm and sound of EchoMuse."
