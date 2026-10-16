@@ -1,5 +1,6 @@
 package com.example.echomuse.ui
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echomuse.data.AudioEngine
@@ -22,11 +23,24 @@ enum class NavigationTab {
     FAVORITES
 }
 
+enum class VisualizerTheme(
+    val themeName: String,
+    val primaryColor: Color,
+    val secondaryColor: Color
+) {
+    NEON_SYNTH("Neon Synth", Color(0xFF00E5FF), Color(0xFF9D4EDD)),
+    CYBERPUNK("Cyberpunk", Color(0xFFFF007F), Color(0xFF00F0FF)),
+    GOLDEN_SUNSET("Golden Sunset", Color(0xFFFF9100), Color(0xFFFFD600)),
+    EMERALD_FOREST("Emerald Forest", Color(0xFF00E676), Color(0xFF1DE9B6))
+}
+
 data class MusicUiState(
     val currentSong: Song? = null,
     val isPlaying: Boolean = false,
     val playbackProgressMs: Long = 0L,
     val playbackSpeed: Float = 1.0f,
+    val stereoBalance: Float = 0.0f, // -1.0 Left to +1.0 Right
+    val visualizerTheme: VisualizerTheme = VisualizerTheme.NEON_SYNTH,
     val isShuffleEnabled: Boolean = false,
     val isRepeatEnabled: Boolean = false,
     val searchQuery: String = "",
@@ -136,6 +150,15 @@ class MusicViewModel(
     fun setPlaybackSpeed(speed: Float) {
         _uiState.update { it.copy(playbackSpeed = speed) }
         audioEngine.setSpeed(speed)
+    }
+
+    fun setStereoBalance(balance: Float) {
+        _uiState.update { it.copy(stereoBalance = balance) }
+        audioEngine.setStereoBalance(balance)
+    }
+
+    fun setVisualizerTheme(theme: VisualizerTheme) {
+        _uiState.update { it.copy(visualizerTheme = theme) }
     }
 
     fun seekTo(progressMs: Long) {

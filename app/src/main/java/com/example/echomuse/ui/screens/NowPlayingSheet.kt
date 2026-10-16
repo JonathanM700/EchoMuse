@@ -3,6 +3,7 @@ package com.example.echomuse.ui.screens
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +64,11 @@ import androidx.compose.ui.unit.dp
 import com.example.echomuse.ui.MusicUiState
 import com.example.echomuse.ui.components.AlbumArtBadge
 import com.example.echomuse.ui.components.AudioWaveformVisualizer
+
+private data class LyricLine(
+    val timeSec: Int,
+    val text: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +98,7 @@ fun NowPlayingSheet(
     )
 
     val speeds = listOf(0.5f, 0.8f, 1.0f, 1.25f, 1.5f, 2.0f)
+    val activeColor = uiState.visualizerTheme.primaryColor
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -142,7 +150,7 @@ fun NowPlayingSheet(
                         Icon(
                             imageVector = Icons.Default.Equalizer,
                             contentDescription = "Equalizer",
-                            tint = MaterialTheme.colorScheme.secondary
+                            tint = activeColor
                         )
                     }
                 }
@@ -195,7 +203,7 @@ fun NowPlayingSheet(
                         Icon(
                             imageVector = Icons.Default.DownloadForOffline,
                             contentDescription = "Download Offline",
-                            tint = if (song.isDownloaded) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (song.isDownloaded) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -233,8 +241,8 @@ fun NowPlayingSheet(
                             onClick = { onSetSpeed(speed) },
                             label = { Text("${speed}x", style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                                selectedContainerColor = activeColor,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             )
                         )
                     }
@@ -252,8 +260,8 @@ fun NowPlayingSheet(
                 onValueChange = { onSeek(it.toLong()) },
                 valueRange = 0f..durationMs.toFloat(),
                 colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.secondary,
-                    activeTrackColor = MaterialTheme.colorScheme.secondary,
+                    thumbColor = activeColor,
+                    activeTrackColor = activeColor,
                     inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 modifier = Modifier.fillMaxWidth()
@@ -293,7 +301,7 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (uiState.isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (uiState.isShuffleEnabled) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -308,7 +316,7 @@ fun NowPlayingSheet(
                 // Play / Pause Circle Button
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = activeColor,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(68.dp)
                 ) {
@@ -333,7 +341,7 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = Icons.Default.Repeat,
                         contentDescription = "Repeat",
-                        tint = if (uiState.isRepeatEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (uiState.isRepeatEnabled) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -359,7 +367,7 @@ fun NowPlayingSheet(
                         Icon(
                             imageVector = Icons.Default.QueueMusic,
                             contentDescription = "Up Next Queue",
-                            tint = MaterialTheme.colorScheme.secondary
+                            tint = activeColor
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -372,7 +380,7 @@ fun NowPlayingSheet(
                     Text(
                         text = "View",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = activeColor,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -380,7 +388,11 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Lyrics Card
+            // Synchronized Karaoke Lyrics Card
+            val lyricLines = parseLyrics(song.lyrics)
+            val currentSec = (currentProgressMs / 1000).toInt()
+            val activeIndex = lyricLines.indexOfLast { it.timeSec <= currentSec }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -398,27 +410,65 @@ fun NowPlayingSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        AudioWaveformVisualizer(isPlaying = uiState.isPlaying)
+                        AudioWaveformVisualizer(
+                            isPlaying = uiState.isPlaying,
+                            activeColor = activeColor
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "LYRICS PREVIEW",
+                            text = "LIVE KARAOKE LYRICS",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = activeColor
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = song.lyrics,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.3f
-                    )
+                    if (lyricLines.isEmpty()) {
+                        Text(
+                            text = song.lyrics,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    } else {
+                        lyricLines.forEachIndexed { index, line ->
+                            val isActive = index == activeIndex
+                            Box(
+                                modifier = Modifier
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isActive) activeColor.copy(alpha = 0.2f) else Color.Transparent)
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = line.text,
+                                    style = if (isActive) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
+                                    color = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+private fun parseLyrics(lyricsText: String): List<LyricLine> {
+    val regex = Regex("\\[(\\d{2}):(\\d{2})]\\s*(.*)")
+    return lyricsText.lines().mapNotNull { line ->
+        val match = regex.find(line.trim())
+        if (match != null) {
+            val mins = match.groupValues[1].toIntOrNull() ?: 0
+            val secs = match.groupValues[2].toIntOrNull() ?: 0
+            val text = match.groupValues[3].ifBlank { "..." }
+            LyricLine(mins * 60 + secs, text)
+        } else {
+            null
         }
     }
 }

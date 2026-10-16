@@ -1,8 +1,6 @@
 package com.example.echomuse.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,8 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material3.AlertDialog
@@ -35,17 +31,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.echomuse.model.EqualizerPreset
 import com.example.echomuse.ui.MusicUiState
+import com.example.echomuse.ui.VisualizerTheme
 
 @Composable
 fun EqualizerDialog(
     uiState: MusicUiState,
     onDismiss: () -> Unit,
-    onPresetSelect: (EqualizerPreset) -> Unit
+    onPresetSelect: (EqualizerPreset) -> Unit,
+    onVisualizerThemeSelect: (VisualizerTheme) -> Unit,
+    onStereoBalanceChange: (Float) -> Unit
 ) {
     val currentEq = uiState.currentEqualizerPreset
     var band60 by remember(currentEq) { mutableFloatStateOf(currentEq.band60Hz) }
@@ -67,7 +65,7 @@ fun EqualizerDialog(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Graphic Equalizer",
+                    text = "Audio Studio & Equalizer",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -75,6 +73,34 @@ fun EqualizerDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // Visualizer Themes
+                Text(
+                    text = "Visualizer Theme",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(VisualizerTheme.entries.toTypedArray()) { theme ->
+                        val isSelected = uiState.visualizerTheme == theme
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onVisualizerThemeSelect(theme) },
+                            label = { Text(theme.themeName) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = theme.primaryColor,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Text(
                     text = "Presets",
                     style = MaterialTheme.typography.labelLarge,
@@ -101,7 +127,25 @@ fun EqualizerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Stereo Balance Slider
+                Text(
+                    text = "Stereo Pan Balance (${if (uiState.stereoBalance < 0) "Left ${(-uiState.stereoBalance * 100).toInt()}%" else if (uiState.stereoBalance > 0) "Right ${(uiState.stereoBalance * 100).toInt()}%" else "Center"})",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Slider(
+                    value = uiState.stereoBalance,
+                    onValueChange = onStereoBalanceChange,
+                    valueRange = -1.0f..1.0f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.secondary,
+                        activeTrackColor = MaterialTheme.colorScheme.secondary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
                     text = "Frequency Bands",
@@ -109,7 +153,7 @@ fun EqualizerDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Bands Sliders
                 EqBandSlider("60 Hz", band60) { band60 = it }
@@ -118,7 +162,7 @@ fun EqualizerDialog(
                 EqBandSlider("3.6 kHz", band3600) { band3600 = it }
                 EqBandSlider("14 kHz", band14000) { band14000 = it }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Bass Boost Switch
                 Row(

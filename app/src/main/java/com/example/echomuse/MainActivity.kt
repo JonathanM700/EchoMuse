@@ -240,7 +240,9 @@ fun EchoMuseApp(
         EqualizerDialog(
             uiState = uiState,
             onDismiss = { viewModel.setEqualizerOpen(false) },
-            onPresetSelect = { viewModel.selectEqualizerPreset(it) }
+            onPresetSelect = { viewModel.selectEqualizerPreset(it) },
+            onVisualizerThemeSelect = { viewModel.setVisualizerTheme(it) },
+            onStereoBalanceChange = { viewModel.setStereoBalance(it) }
         )
     }
 

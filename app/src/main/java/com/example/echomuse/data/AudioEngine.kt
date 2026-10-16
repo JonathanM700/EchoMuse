@@ -12,6 +12,7 @@ class AudioEngine {
     private var currentFrequency = 440f
     private var currentVolume = 1.0f
     private var playbackSpeed = 1.0f
+    private var stereoBalance = 0.0f // -1.0f (Full Left) to +1.0f (Full Right)
 
     fun startSynthTone(frequency: Float, speed: Float = 1.0f) {
         stopSynthTone()
@@ -24,7 +25,7 @@ class AudioEngine {
                 val sampleRate = 44100
                 val buffSize = AudioTrack.getMinBufferSize(
                     sampleRate,
-                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.CHANNEL_OUT_STEREO,
                     AudioFormat.ENCODING_PCM_16BIT
                 )
 
@@ -39,7 +40,7 @@ class AudioEngine {
                         AudioFormat.Builder()
                             .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                             .setSampleRate(sampleRate)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                             .build()
                     )
                     .setBufferSizeInBytes(buffSize)
@@ -55,14 +56,26 @@ class AudioEngine {
                     val effectiveFreq = currentFrequency * playbackSpeed
                     val angularFrequency = 2.0 * Math.PI * effectiveFreq / sampleRate
 
-                    for (i in samples.indices) {
-                        // Ambient synth tone with soft harmonic warmth
+                    val leftGain = if (stereoBalance <= 0f) 1.0f else (1.0f - stereoBalance)
+                    val rightGain = if (stereoBalance >= 0f) 1.0f else (1.0f + stereoBalance)
+
+                    var i = 0
+                    while (i < samples.size - 1) {
                         val sine1 = sin(angle)
                         val sine2 = 0.3 * sin(angle * 1.5)
                         val combined = (sine1 + sine2) * 0.4 * currentVolume
-                        samples[i] = (combined * Short.MAX_VALUE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+
+                        val leftSample = (combined * leftGain * Short.MAX_VALUE).toInt()
+                            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                        val rightSample = (combined * rightGain * Short.MAX_VALUE).toInt()
+                            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+
+                        samples[i] = leftSample
+                        samples[i + 1] = rightSample
+
                         angle += angularFrequency
                         if (angle > 2.0 * Math.PI) angle -= 2.0 * Math.PI
+                        i += 2
                     }
 
                     audioTrack?.write(samples, 0, samples.size)
@@ -79,6 +92,10 @@ class AudioEngine {
 
     fun setSpeed(speed: Float) {
         playbackSpeed = speed
+    }
+
+    fun setStereoBalance(balance: Float) {
+        stereoBalance = balance.coerceIn(-1.0f, 1.0f)
     }
 
     fun stopSynthTone() {
